@@ -1,0 +1,11 @@
+FROM ollama/ollama:latest
+
+# Install ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates && apt-get clean
+
+# Copy proxy certificate to the correct directory
+COPY proxy_cert.pem /etc/ssl/certs/proxy_cert.pem
+COPY proxy_cert.pem /usr/local/share/ca-certificates/proxy_cert.crt
+
+# Update certificate store
+RUN update-ca-certificates

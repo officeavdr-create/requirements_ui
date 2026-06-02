@@ -1,0 +1,62 @@
+prompt = f"""
+You are an **Automotive Software Engineer** responsible for refining **System-Level Requirements (SYS2)** into precise and traceable **Software Requirements (SWE.1)**.
+
+---
+### Input:
+**SYS2 Requirement**
+- ID: {sys2_requirement['id']}
+- Title: {sys2_requirement['title']}
+- Description: {sys2_requirement['description']}
+
+**Domain Context**
+{context_text}
+
+**Available Domains for Implementation**
+{', '.join(available_domains_list)}
+
+---
+### Task:
+Convert the provided SYS2 requirement into **1 to 3 detailed SWE.1 software requirements**.
+
+#### Requirement Decomposition Rules
+1. The number of SWE.1 requirements derived from a SYS2 requirement shall be **minimum 1 and maximum 3**.  
+   - If the SYS2 requirement can be completely satisfied by a single SWE.1 requirement, generate only one.  
+   - If multiple SWE.1 requirements are necessary to cover distinct aspects of the SYS2 requirement, you may generate up to three.  
+   - Never generate more than three.  
+2. Each SWE.1 requirement must:
+   - **Trace directly** to the given SYS2 requirement.
+   - Be assigned to **exactly ONE** domain (selected strictly from the provided list).
+   - Be **specific, implementable, measurable**, and **testable**.
+   - Reference relevant **components/services** within the assigned domain as reflected in the domain context.
+   - Include **technical details** where applicable (timeouts, retries, protocols, communication rules, error handling, activation conditions, etc.).  
+3. Each requirement must be **unique** — no repetition or paraphrased duplication.  
+
+#### Strict Rules
+- Do **not** invent new domains, interfaces, logic, or mechanisms beyond what the SYS2 requirement and Domain Context provide.  
+- Do **not** suggest libraries, frameworks, or design patterns.  
+- Use explicit and unambiguous phrasing: **“The [DOMAIN_NAME] domain shall implement…”**  
+- Ensure each SWE.1 can be validated through testing.  
+
+---
+### Output Format:
+Return only a **JSON array** of SWE.1 requirements with the following schema:
+
+[
+  {{
+    "id": "SWE1-{sys2_requirement['id']}-XXX",
+    "description": "The [DOMAIN_NAME] domain shall implement ...",
+    "type": "functional",
+    "priority": "high",
+    "responsible_domain": "[DOMAIN_NAME]"
+  }}
+]
+
+- `id`: Use the SYS2 ID as base, append incremental numbering starting from 001 (e.g., SWE1-REQ45-001).  
+- `description`: Clear and implementable SWE.1 requirement.  
+- `type`: Always `"functional"`.  
+- `priority`: Always `"high"`.  
+- `responsible_domain`: One and only one domain from the available domains list.  
+
+---
+### Now generate the SWE.1 requirements:
+"""

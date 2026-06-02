@@ -1,0 +1,145 @@
+# version: '3.8'
+
+services:
+  # # PostgreSQL Database with pgvector extension
+  # database:
+  #   image: pgvector/pgvector:pg15
+  #   container_name: swe1-database
+  #   environment:
+  #     POSTGRES_DB: swe1_generator
+  #     POSTGRES_USER: swe1_user
+  #     POSTGRES_PASSWORD: swe1_secure_password
+  #     POSTGRES_HOST_AUTH_METHOD: trust
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./init-scripts:/docker-entrypoint-initdb.d
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - swe1-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U swe1_user -d swe1_generator"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   restart: unless-stopped
+  database:
+    image: ankane/pgvector:v0.5.1
+    container_name: swe1-database
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-swe1_generator}
+      - POSTGRES_USER=${POSTGRES_USER:-swe1_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    networks:
+      - swe1-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-swe1_user} -d ${POSTGRES_DB:-swe1_generator}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ollama for AI Processing
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: swe1-ollama
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   environment:
+  #     - OLLAMA_HOST=0.0.0.0
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   restart: unless-stopped
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: swe1-ollama
+    ports:
+      - "11437:11434"  # Map host port 11437 to container port 11434 (Ollama default)
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - swe1-network
+    deploy:  # Add this section for GPU support
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all
+    restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:11434/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 60s
+    healthcheck:
+          test:  [ "CMD-SHELL", "bash", "-c", "{ printf >&3 'GET / HTTP/1.0\\r\\n\\r\\n'; cat <&3; } 3<>/dev/tcp/localhost/11434 | grep 'Ollama is' || exit 1"  ]
+          interval: 10s
+          timeout: 5s
+          retries: 3
+          start_period: 10s
+  # SWE.1 Requirements Generator Application
+  swe1-app:
+    build: .
+    container_name: swe1-application
+    depends_on:
+      database:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://postgres:postgres@172.17.0.1:54322/postgres
+
+      # Ollama Configuration
+      OLLAMA_BASE_URL: http://ollama:11434
+      EMBEDDING_MODEL: jeffh/intfloat-e5-base-v2:f32
+      GENERATION_MODEL: gemma3:27b
+      
+      # AI Processing Configuration
+      DEFAULT_CHUNK_SIZE: 256
+      SIMILARITY_THRESHOLD: 0.7
+      SIMILARITY_TOP_K: 5
+      MAX_GENERATION_TOKENS: 2048
+      
+      # Application Configuration
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - swe1-network
+volumes:
+  postgres_data:
+  # ollama_data:
+  ollama_data:  # Add this for Ollama persistence
+    driver: local
+
+networks:
+  swe1-network:
+    driver: bridge
